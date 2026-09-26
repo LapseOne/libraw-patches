@@ -1,0 +1,269 @@
+diff --git a/libraw/libraw.h b/libraw/libraw.h
+index a1d2305..32e0b29 100644
+--- a/libraw/libraw.h
++++ b/libraw/libraw.h
+@@ -388,7 +388,7 @@ protected:
+   void crxConvertPlaneLineDf(void *, int);
+   /* Panasonic Compression 8 parallel decoder stubs*/
+   virtual void pana8_decode_loop(void*);
+-  int pana8_decode_strip(void*, int); // return: 0 if OK, non-zero on error
++  int pana8_decode_strip(void*, int, unsigned row_base = 0); // return: 0 if OK, non-zero on error
+ 
+   int FCF(int row, int col)
+   {
+diff --git a/libraw/libraw_internal.h b/libraw/libraw_internal.h
+index efffc50..f530158 100644
+--- a/libraw/libraw_internal.h
++++ b/libraw/libraw_internal.h
+@@ -159,11 +159,12 @@ typedef struct
+ 	uint16_t tag40a[17], tag40b[17], tag41[17];
+ 	uint16_t stripe_count; // 0x42
+ 	uint16_t tag43;
+-	INT64	 stripe_offsets[5]; //0x44
+-	uint16_t stripe_left[5]; // 0x45
+-	uint32_t stripe_compressed_size[5]; //0x46
+-	uint16_t stripe_width[5]; //0x47
+-	uint16_t stripe_height[5];
++	uint16_t stripe_total; // 0x44 total entry count (multi-segment if > stripe_count)
++	INT64	 stripe_offsets[8]; //0x44
++	uint16_t stripe_left[8]; // 0x45
++	uint32_t stripe_compressed_size[8]; //0x46
++	uint16_t stripe_width[8]; //0x47
++	uint16_t stripe_height[8];
+ } pana8_tags_t;
+ 
+ typedef struct
+diff --git a/src/decoders/pana8.cpp b/src/decoders/pana8.cpp
+index 3343d74..f7aa204 100644
+--- a/src/decoders/pana8.cpp
++++ b/src/decoders/pana8.cpp
+@@ -20,6 +20,7 @@ it under the terms of the one of two licenses as you choose:
+ 
+  // in 8-byte words, 800kb
+ #define PANA8_BUFSIZE 102400
++#define PANA8_MAX_STRIPES 8
+ 
+ class pana8_bufio_t
+ {
+@@ -67,7 +68,7 @@ struct pana8_param_t
+ 	bool DecodeC8(
+ 		pana8_bufio_t& bufio,
+ 		unsigned int width, unsigned int height,
+-		LibRaw *libraw, uint16_t left_margin);
++		LibRaw *libraw, uint16_t left_margin, unsigned row_base);
+ 	uint32_t GetDBit(uint64_t a2);
+ };
+ 
+@@ -104,22 +105,43 @@ void pana8_bufio_t::refill(uint32_t newoffset)
+ 
+ void LibRaw::panasonicC8_load_raw()
+ {
++	fprintf(stderr, "[libraw] C8 multi-segment decoder active (stripes=%u/%u)\n",
++			libraw_internal_data.unpacker_data.pana8.stripe_count,
++			libraw_internal_data.unpacker_data.pana8.stripe_total);
+ 	int errs = 0;
+-	unsigned totalw = 0;
+ 	INT64 fsz = libraw_internal_data.internal_data.input->size();
+-	if (libraw_internal_data.unpacker_data.pana8.stripe_count > 5) errs++;
+-	for (int i = 0; i < libraw_internal_data.unpacker_data.pana8.stripe_count && i < 5; i++)
++	pana8_tags_t &pana8 = libraw_internal_data.unpacker_data.pana8;
++	const int total =
++		MIN(PANA8_MAX_STRIPES, (int)MAX(pana8.stripe_total, (uint16_t)pana8.stripe_count));
++	// 0x42 = stripes per vertical segment; total > this means multi-segment layout
++	const int per_seg = pana8.stripe_count ? (int)pana8.stripe_count : total;
++	if (total > PANA8_MAX_STRIPES) errs++;
++	unsigned row_cursor = 0;
++	for (int seg_start = 0; seg_start < total; seg_start += per_seg)
+ 	{
+-		if (libraw_internal_data.unpacker_data.pana8.stripe_height[i] != imgdata.sizes.raw_height)
+-			errs++;
+-		if ( unsigned(libraw_internal_data.unpacker_data.pana8.stripe_left[i]) + unsigned(libraw_internal_data.unpacker_data.pana8.stripe_width[i]) > unsigned(imgdata.sizes.raw_width))
+-			errs++;
+-		if (libraw_internal_data.unpacker_data.pana8.stripe_offsets[i] < 0
+-			|| (libraw_internal_data.unpacker_data.pana8.stripe_offsets[i] + INT64((libraw_internal_data.unpacker_data.pana8.stripe_compressed_size[i] + 7u) / 8u)) > fsz)
+-			errs++;
+-		totalw += libraw_internal_data.unpacker_data.pana8.stripe_width[i];
++		const int seg_end = MIN(total, seg_start + per_seg);
++		unsigned seg_w = 0;
++		unsigned seg_h = 0;
++		for (int i = seg_start; i < seg_end; i++)
++		{
++			if (i == seg_start)
++				seg_h = pana8.stripe_height[i];
++			else if (pana8.stripe_height[i] != seg_h)
++				errs++;
++			if (unsigned(pana8.stripe_left[i]) + unsigned(pana8.stripe_width[i]) >
++				unsigned(imgdata.sizes.raw_width))
++				errs++;
++			if (pana8.stripe_offsets[i] < 0
++				|| (pana8.stripe_offsets[i] +
++					INT64((pana8.stripe_compressed_size[i] + 7u) / 8u)) > fsz)
++				errs++;
++			seg_w += pana8.stripe_width[i];
++		}
++		if (seg_w != imgdata.sizes.raw_width) errs++;
++		if (row_cursor + seg_h > imgdata.sizes.raw_height) errs++;
++		row_cursor += seg_h;
+ 	}
+-	if (totalw != imgdata.sizes.raw_width) errs++;
++	if (row_cursor != imgdata.sizes.raw_height) errs++;
+ 	if (errs)
+ 		throw LIBRAW_EXCEPTION_IO_CORRUPT;
+ 
+@@ -129,34 +151,49 @@ void LibRaw::panasonicC8_load_raw()
+ 
+ void LibRaw::pana8_decode_loop(void *data)
+ {
++	pana8_tags_t &pana8 = libraw_internal_data.unpacker_data.pana8;
++	const int total =
++		MIN(PANA8_MAX_STRIPES, (int)MAX(pana8.stripe_total, (uint16_t)pana8.stripe_count));
++	const int per_seg = pana8.stripe_count ? (int)pana8.stripe_count : total;
++	unsigned row_bases[PANA8_MAX_STRIPES];
++	unsigned row_cursor = 0;
++	for (int seg_start = 0; seg_start < total; seg_start += per_seg)
++	{
++		const int seg_end = MIN(total, seg_start + per_seg);
++		const unsigned seg_h = pana8.stripe_height[seg_start];
++		for (int i = seg_start; i < seg_end; i++)
++			row_bases[i] = row_cursor;
++		row_cursor += seg_h;
++	}
+ #ifdef LIBRAW_USE_OPENMP
+-	int errs = 0, scount = MIN(5,libraw_internal_data.unpacker_data.pana8.stripe_count);
++	int errs = 0, scount = total;
+ #pragma omp parallel for 
+   for (int stream = 0; stream < scount; stream++)
+   {
+-		if (pana8_decode_strip(data, stream))
++		if (pana8_decode_strip(data, stream, row_bases[stream]))
+ 			errs++;
+   }
+ 	if(errs)
+       throw LIBRAW_EXCEPTION_IO_CORRUPT;
+ #else
+-  for (int stream = 0; stream < libraw_internal_data.unpacker_data.pana8.stripe_count && stream < 5; stream++)
+-    if (pana8_decode_strip(data, stream))
++  for (int stream = 0; stream < total; stream++)
++    if (pana8_decode_strip(data, stream, row_bases[stream]))
+       throw LIBRAW_EXCEPTION_IO_CORRUPT;
+ #endif
+ }
+ 
+-int LibRaw::pana8_decode_strip(void* data, int stream)
++int LibRaw::pana8_decode_strip(void* data, int stream, unsigned row_base)
+ {
+ 	pana8_param_t *pana8_param = (pana8_param_t*)data;
+-	if (!data || stream < 0 || stream > 4 || stream > libraw_internal_data.unpacker_data.pana8.stripe_count) return 1; // error
++	if (!data || stream < 0 || stream >= PANA8_MAX_STRIPES ||
++		stream >= libraw_internal_data.unpacker_data.pana8.stripe_total) return 1; // error
+ 
+ 	unsigned exactbytes = (libraw_internal_data.unpacker_data.pana8.stripe_compressed_size[stream] + 7u) / 8u;
+     pana8_bufio_t bufio(libraw_internal_data.internal_data.input,
+                         libraw_internal_data.unpacker_data.pana8.stripe_offsets[stream], exactbytes);
+     return !pana8_param->DecodeC8(bufio, libraw_internal_data.unpacker_data.pana8.stripe_width[stream],
+                                   libraw_internal_data.unpacker_data.pana8.stripe_height[stream], this,
+-                                  libraw_internal_data.unpacker_data.pana8.stripe_left[stream]);
++                                  libraw_internal_data.unpacker_data.pana8.stripe_left[stream], row_base);
+ }
+ 
+ struct pana8_base_t
+@@ -174,7 +211,7 @@ struct pana8_base_t
+ };
+ 
+ bool pana8_param_t::DecodeC8(pana8_bufio_t &bufio, unsigned int width, unsigned int height, LibRaw *libraw,
+-                             uint16_t left_margin)
++                             uint16_t left_margin, unsigned row_base)
+ {
+   unsigned halfwidth = width >> 1;
+   unsigned halfheight = height >> 1;
+@@ -311,7 +348,7 @@ bool pana8_param_t::DecodeC8(pana8_bufio_t &bufio, unsigned int width, unsigned
+ 				  line_base.clone((uint32_t *)(outrowp));
+ 		  }
+ 
+-		  int destrow = current_row * 2;
++		  int destrow = (int)row_base + current_row * 2;
+ 		  uint16_t *destrow0 = libraw->imgdata.rawdata.raw_image + (destrow * libraw->imgdata.sizes.raw_width) + left_margin;
+ 		  uint16_t *destrow1 =
+ 			  libraw->imgdata.rawdata.raw_image + (destrow + 1) * libraw->imgdata.sizes.raw_width + left_margin;
+diff --git a/src/metadata/tiff.cpp b/src/metadata/tiff.cpp
+index c129cd3..8f67934 100644
+--- a/src/metadata/tiff.cpp
++++ b/src/metadata/tiff.cpp
+@@ -300,8 +300,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_SHORT && len == 1)
+         {
+           ushort val = get2();
+-          if (val > 5)
+-            val = 5;
++          if (val > 8)
++            val = 8;
+           pana8.stripe_count = val;
+         }
+         break;
+@@ -309,8 +309,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_SHORT && len == 1)
+         {
+           ushort val = get2();
+-          if (val > 5)
+-            val = 5;
++          if (val > 8)
++            val = 8;
+           pana8.tag43 = val;
+         }
+         break;
+@@ -318,8 +318,9 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_UNDEFINED && len == 50)
+         {
+           ushort count = get2();
+-          if (count > 5)
+-            count = 5;
++          if (count > 8)
++            count = 8;
++          pana8.stripe_total = count;
+           for (i = 0; i < count; i++)
+             pana8.stripe_offsets[i] = get4();
+         }
+@@ -328,8 +329,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_UNDEFINED && len == 50)
+         {
+           ushort count = get2();
+-          if (count > 5)
+-            count = 5;
++          if (count > 8)
++            count = 8;
+           for (i = 0; i < count; i++)
+             pana8.stripe_left[i] = get4();
+         }
+@@ -338,8 +339,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_UNDEFINED && len == 50)
+         {
+           ushort count = get2();
+-          if (count > 5)
+-            count = 5;
++          if (count > 8)
++            count = 8;
+           for (i = 0; i < count; i++)
+             pana8.stripe_compressed_size[i] = get4();
+         }
+@@ -348,8 +349,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_UNDEFINED && len == 26)
+         {
+           ushort count = get2();
+-          if (count > 5)
+-            count = 5;
++          if (count > 8)
++            count = 8;
+           for (i = 0; i < count; i++)
+             pana8.stripe_width[i] = get2();
+         }
+@@ -358,8 +359,8 @@ int LibRaw::parse_tiff_ifd(INT64 base)
+         if (type == LIBRAW_EXIFTAG_TYPE_UNDEFINED && len == 26)
+         {
+           ushort count = get2();
+-          if (count > 5)
+-            count = 5;
++          if (count > 8)
++            count = 8;
+           for (i = 0; i < count; i++)
+             pana8.stripe_height[i] = get2();
+         }
