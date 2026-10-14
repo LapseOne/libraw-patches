@@ -1,0 +1,216 @@
+diff --git a/src/tables/colordata.cpp b/src/tables/colordata.cpp
+index 86dcd67..547bab5 100644
+--- a/src/tables/colordata.cpp
++++ b/src/tables/colordata.cpp
+@@ -1629,12 +1629,12 @@ int LibRaw::adobe_coeff(unsigned make_idx, const char *t_model,
+       { 1295,108,-311,256,828,-65,-28,750,254 } }, /* temp */
+     { LIBRAW_CAMERAMAKER_Sigma, "sd Quattro", 2047, 0,
+       { 1295,108,-311,256,828,-65,-28,750,254 } }, /* temp */
+-    { LIBRAW_CAMERAMAKER_Sigma, "SD9", 15, 4095,
+-      { 13564,-2537,-751,-5465,15154,194,-67,116,10425 } },
+-    { LIBRAW_CAMERAMAKER_Sigma, "SD10", 15, 16383,
+-      { 6787,-1682,575,-3091,8357,160,217,-369,12314 } },
+-    { LIBRAW_CAMERAMAKER_Sigma, "SD14", 15, 16383,
+-      { 13589,-2509,-739,-5440,15104,193,-61,105,10554 } },
++    { LIBRAW_CAMERAMAKER_Sigma, "SD9", 0, 16383,
++      { 10906,-2391,-89,-4720,12895,197,73,-118,12177 } },
++    { LIBRAW_CAMERAMAKER_Sigma, "SD10", 0, 16383,
++      { 13553,-2542,-734,-5467,15154,195,-62,109,10534 } },
++    { LIBRAW_CAMERAMAKER_Sigma, "SD14", 0, 16383,
++      { 13548,-2544,-727,-5467,15154,195,-61,106,10582 } },
+     { LIBRAW_CAMERAMAKER_Sigma, "SD15", 15, 4095,
+       { 13556,-2537,-730,-5462,15144,195,-61,106,10577 } },
+ // Merrills + SD1
+@@ -1649,8 +1649,10 @@ int LibRaw::adobe_coeff(unsigned make_idx, const char *t_model,
+ // Sigma DP (non-Merrill Versions)
+     { LIBRAW_CAMERAMAKER_Sigma, "DP1X", 0, 4095,
+       { 13704,-2452,-857,-5413,15073,186,-89,151,9820 } },
+-    { LIBRAW_CAMERAMAKER_Sigma, "DP1", 0, 4095,
+-      { 12774,-2591,-394,-5333,14676,207,15,-21,12127 } },
++    { LIBRAW_CAMERAMAKER_Sigma, "DP1S", 0, 16383,
++      { 12835,-2787,-453,-5555,15179,215,-14,37,11678 } },
++    { LIBRAW_CAMERAMAKER_Sigma, "DP1", 0, 16383,
++      { 13183,-2649,-661,-5497,15135,201,-57,106,10587 } },
+     { LIBRAW_CAMERAMAKER_Sigma, "DP", 0, 4095,
+       //  { 7401,-1169,-567,2059,3769,1510,664,3367,5328 } },
+       { 13100,-3638,-847,6855,2369,580,2723,3218,3251 } }, /* LibRaw */
+diff --git a/src/utils/open.cpp b/src/utils/open.cpp
+index ffd439e..8ce3f9a 100644
+--- a/src/utils/open.cpp
++++ b/src/utils/open.cpp
+@@ -380,22 +380,22 @@ struct foveon_data_t
+   const int left_margin, top_margin;
+   const int width, height;
+ } foveon_data[] = {
+-    {"Sigma", "SD9", 2304, 1531, 12000, 20, 8, 2266, 1510},
+-    {"Sigma", "SD9", 1152, 763, 12000, 10, 2, 1132, 755},
+-    {"Sigma", "SD10", 2304, 1531, 12000, 20, 8, 2266, 1510},
+-    {"Sigma", "SD10", 1152, 763, 12000, 10, 2, 1132, 755},
+-    {"Sigma", "SD14", 2688, 1792, 14000, 18, 12, 2651, 1767},
+-    {"Sigma", "SD14", 2688, 896, 14000, 18, 6, 2651, 883}, // 2/3
+-    {"Sigma", "SD14", 1344, 896, 14000, 9, 6, 1326, 883},  // 1/2
++    {"Sigma", "SD9", 2304, 1531, 16383, 20, 8, 2266, 1510},
++    {"Sigma", "SD9", 1152, 763, 16383, 10, 2, 1132, 755},
++    {"Sigma", "SD10", 2304, 1531, 16383, 20, 8, 2266, 1510},
++    {"Sigma", "SD10", 1152, 763, 16383, 10, 2, 1132, 755},
++    {"Sigma", "SD14", 2688, 1792, 16383, 18, 12, 2651, 1767},
++    {"Sigma", "SD14", 2688, 896, 16383, 18, 6, 2651, 883}, // 2/3
++    {"Sigma", "SD14", 1344, 896, 16383, 9, 6, 1326, 883},  // 1/2
+     {"Sigma", "SD15", 2688, 1792, 2900, 18, 12, 2651, 1767},
+     {"Sigma", "SD15", 2688, 896, 2900, 18, 6, 2651, 883}, // 2/3 ?
+     {"Sigma", "SD15", 1344, 896, 2900, 9, 6, 1326, 883},  // 1/2 ?
+-    {"Sigma", "DP1", 2688, 1792, 2100, 18, 12, 2651, 1767},
+-    {"Sigma", "DP1", 2688, 896, 2100, 18, 6, 2651, 883}, // 2/3 ?
+-    {"Sigma", "DP1", 1344, 896, 2100, 9, 6, 1326, 883},  // 1/2 ?
+-    {"Sigma", "DP1S", 2688, 1792, 2200, 18, 12, 2651, 1767},
+-    {"Sigma", "DP1S", 2688, 896, 2200, 18, 6, 2651, 883}, // 2/3
+-    {"Sigma", "DP1S", 1344, 896, 2200, 9, 6, 1326, 883},  // 1/2
++    {"Sigma", "DP1", 2688, 1792, 16383, 18, 12, 2651, 1767},
++    {"Sigma", "DP1", 2688, 896, 16383, 18, 6, 2651, 883}, // 2/3 ?
++    {"Sigma", "DP1", 1344, 896, 16383, 9, 6, 1326, 883},  // 1/2 ?
++    {"Sigma", "DP1S", 2688, 1792, 16383, 18, 12, 2651, 1767},
++    {"Sigma", "DP1S", 2688, 896, 16383, 18, 6, 2651, 883}, // 2/3
++    {"Sigma", "DP1S", 1344, 896, 16383, 9, 6, 1326, 883},  // 1/2
+     {"Sigma", "DP1X", 2688, 1792, 3560, 18, 12, 2651, 1767},
+     {"Sigma", "DP1X", 2688, 896, 3560, 18, 6, 2651, 883}, // 2/3
+     {"Sigma", "DP1X", 1344, 896, 3560, 9, 6, 1326, 883},  // 1/2
+diff --git a/src/x3f/x3f_parse_process.cpp b/src/x3f/x3f_parse_process.cpp
+index 5322e4d..9a77d66 100644
+--- a/src/x3f/x3f_parse_process.cpp
++++ b/src/x3f/x3f_parse_process.cpp
+@@ -59,6 +59,109 @@ BSD-style License
+ 
+ #define Sigma_X3F 22
+ 
++static const struct x3f_sd_model_s {
++  const char *model;
++  float quad[9][3];
++} x3f_sd_models[] = {
++    {"SD9", {
++        {-44.84f,-48.99f,-66.14f},
++        {2831.71f,-1226.82f,1719.64f},
++        {-1289.90f,4095.86f,-6826.46f},
++        {1143.71f,-234.26f,9298.74f},
++        {-15714.65f,-108033.56f,56052.93f},
++        {-6242.07f,-116965.01f,78274.47f},
++        {33219.57f,76924.31f,-139776.05f},
++        {51551.35f,279403.21f,-220102.32f},
++        {-31375.87f,-64707.14f,109942.74f},
++     }},
++    {"SD10", {
++        {-180.19f,-100.71f,-340.37f},
++        {3270.57f,-7738.72f,3683.75f},
++        {682.78f,18071.04f,-16235.99f},
++        {122.43f,-8364.11f,19106.55f},
++        {-644.18f,-9249.82f,13638.74f},
++        {-345.61f,-15710.90f,19473.53f},
++        {891.74f,6854.81f,-8650.17f},
++        {1110.88f,25368.83f,-33337.31f},
++        {-670.20f,-3215.17f,3229.29f},
++     }},
++    {"SD14", {
++        {-152.42f,-52.52f,-184.55f},
++        {9199.05f,-12575.01f,5386.42f},
++        {244.18f,26471.91f,-28661.99f},
++        {-910.04f,-9915.65f,33505.21f},
++        {6151.52f,-16771.66f,2763.01f},
++        {4903.54f,-28316.63f,7177.18f},
++        {721.40f,-7573.75f,6119.51f},
++        {-12843.59f,28761.99f,5141.43f},
++        {592.31f,13323.89f,-11005.62f},
++     }},
++    {"DP1", {
++        {-21.36f,-19.09f,-16.76f},
++        {-4926.82f,-37320.68f,13996.43f},
++        {37390.43f,72452.79f,-53345.86f},
++        {-18069.08f,-26271.77f,61210.81f},
++        {2373226.95f,572449.23f,1018861.86f},
++        {1588004.29f,382864.30f,776926.78f},
++        {-746136.00f,-82629.65f,-522188.67f},
++        {-4743620.28f,-1052833.09f,-2248509.95f},
++        {799120.25f,98895.27f,493909.03f},
++     }},
++    {"DP1S", {
++        {3.13f,2.28f,1.79f},
++        {15054.29f,-12278.68f,4963.63f},
++        {-3931.19f,27476.94f,-18628.06f},
++        {986.20f,-10565.89f,23321.92f},
++        {-337384.79f,-591044.82f,-244980.32f},
++        {-2301.37f,-145055.48f,-47783.79f},
++        {254033.88f,304371.44f,190379.33f},
++        {671725.50f,1119066.58f,528514.99f},
++        {-327098.92f,-383684.68f,-229155.13f},
++     }},
++};
++
++static const struct x3f_sd_model_s *x3f_sd_find(const char *model) {
++  if (!model || !*model)
++    return NULL;
++  const char *m = model;
++  const char *sp = strchr(model, ' ');
++  if (sp && sp[1] && !strncasecmp(model, "SIGMA", 5))
++    m = sp + 1;
++  const unsigned n = sizeof x3f_sd_models / sizeof x3f_sd_models[0];
++  for (unsigned k = 0; k < n; k++)
++    if (!strcasecmp(m, x3f_sd_models[k].model))
++      return &x3f_sd_models[k];
++  return NULL;
++}
++
++static void x3f_sd_transform(const char *model, ushort (*image)[3],
++                             size_t npix) {
++  const struct x3f_sd_model_s *pm = x3f_sd_find(model);
++  if (!pm || !image)
++    return;
++  const double s = 4095.0;
++  const double lift = 2.37841423;
++  for (size_t p = 0; p < npix; p++) {
++    const double r = (double)image[p][0] / s;
++    const double g = (double)image[p][1] / s;
++    const double b = (double)image[p][2] / s;
++    const double basis[9] = {1.0,  r,      g,      b,
++                             r * r, g * g, b * b, r * g,
++                             r * b + g * b};
++    for (int c = 0; c < 3; c++) {
++      double v = 0.0;
++      for (int k = 0; k < 9; k++)
++        v += (double)pm->quad[k][c] * basis[k];
++      v *= lift;
++      if (v < 0.0)
++        v = 0.0;
++      if (v > 16383.0)
++        v = 16383.0;
++      image[p][c] = (ushort)(int)(v + 0.5);
++    }
++  }
++}
++
+ void x3f_clear(void *p) { x3f_delete((x3f_t *)p); }
+ 
+ static void utf2char(utf16_t *str, char *buffer, unsigned bufsz)
+@@ -306,6 +409,14 @@ void LibRaw::parse_x3f()
+     libraw_internal_data.unpacker_data.meta_offset = DE->input.offset + 8;
+     libraw_internal_data.unpacker_data.meta_length = DE->input.size - 28;
+   }
++  if (x3f_sd_find(imgdata.idata.model))
++  {
++    for (int c = 0; c < 4; c++)
++      imgdata.color.cam_mul[c] = 1.0f;
++    imgdata.color.black = 0;
++    memset(imgdata.color.cblack, 0, sizeof imgdata.color.cblack);
++    imgdata.color.maximum = 0x3fff;
++  }
+ }
+ 
+ int LibRaw::x3f_thumb_size()
+@@ -727,6 +838,10 @@ void LibRaw::x3f_load_raw()
+     if (TRU && Q && Q->quattro_layout &&
+         !(imgdata.rawparams.specials & LIBRAW_RAWSPECIAL_NODP2Q_INTERPOLATERG))
+       x3f_dpq_interpolate_rg();
++
++    if (imgdata.rawdata.color3_image)
++      x3f_sd_transform(imgdata.idata.model, imgdata.rawdata.color3_image,
++                       (size_t)S.raw_height * S.raw_width);
+   }
+   else
+     raise_error = 1;

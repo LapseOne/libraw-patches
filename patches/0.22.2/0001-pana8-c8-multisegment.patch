@@ -1,5 +1,5 @@
 diff --git a/libraw/libraw.h b/libraw/libraw.h
-index a1d2305..32e0b29 100644
+index a1d2305..b04decf 100644
 --- a/libraw/libraw.h
 +++ b/libraw/libraw.h
 @@ -388,7 +388,7 @@ protected:
@@ -7,12 +7,12 @@ index a1d2305..32e0b29 100644
    /* Panasonic Compression 8 parallel decoder stubs*/
    virtual void pana8_decode_loop(void*);
 -  int pana8_decode_strip(void*, int); // return: 0 if OK, non-zero on error
-+  int pana8_decode_strip(void*, int, unsigned row_base = 0); // return: 0 if OK, non-zero on error
++  int pana8_decode_strip(void*, int, unsigned row_base = 0);
  
    int FCF(int row, int col)
    {
 diff --git a/libraw/libraw_internal.h b/libraw/libraw_internal.h
-index efffc50..f530158 100644
+index efffc50..a1c1e4e 100644
 --- a/libraw/libraw_internal.h
 +++ b/libraw/libraw_internal.h
 @@ -159,11 +159,12 @@ typedef struct
@@ -24,17 +24,17 @@ index efffc50..f530158 100644
 -	uint32_t stripe_compressed_size[5]; //0x46
 -	uint16_t stripe_width[5]; //0x47
 -	uint16_t stripe_height[5];
-+	uint16_t stripe_total; // 0x44 total entry count (multi-segment if > stripe_count)
-+	INT64	 stripe_offsets[8]; //0x44
-+	uint16_t stripe_left[8]; // 0x45
-+	uint32_t stripe_compressed_size[8]; //0x46
-+	uint16_t stripe_width[8]; //0x47
++	uint16_t stripe_total;
++	INT64	 stripe_offsets[8];
++	uint16_t stripe_left[8];
++	uint32_t stripe_compressed_size[8];
++	uint16_t stripe_width[8];
 +	uint16_t stripe_height[8];
  } pana8_tags_t;
  
  typedef struct
 diff --git a/src/decoders/pana8.cpp b/src/decoders/pana8.cpp
-index 3343d74..f7aa204 100644
+index 3343d74..fb3ad37 100644
 --- a/src/decoders/pana8.cpp
 +++ b/src/decoders/pana8.cpp
 @@ -20,6 +20,7 @@ it under the terms of the one of two licenses as you choose:
@@ -54,13 +54,9 @@ index 3343d74..f7aa204 100644
  	uint32_t GetDBit(uint64_t a2);
  };
  
-@@ -104,22 +105,43 @@ void pana8_bufio_t::refill(uint32_t newoffset)
- 
+@@ -105,21 +106,38 @@ void pana8_bufio_t::refill(uint32_t newoffset)
  void LibRaw::panasonicC8_load_raw()
  {
-+	fprintf(stderr, "[libraw] C8 multi-segment decoder active (stripes=%u/%u)\n",
-+			libraw_internal_data.unpacker_data.pana8.stripe_count,
-+			libraw_internal_data.unpacker_data.pana8.stripe_total);
  	int errs = 0;
 -	unsigned totalw = 0;
  	INT64 fsz = libraw_internal_data.internal_data.input->size();
@@ -69,7 +65,6 @@ index 3343d74..f7aa204 100644
 +	pana8_tags_t &pana8 = libraw_internal_data.unpacker_data.pana8;
 +	const int total =
 +		MIN(PANA8_MAX_STRIPES, (int)MAX(pana8.stripe_total, (uint16_t)pana8.stripe_count));
-+	// 0x42 = stripes per vertical segment; total > this means multi-segment layout
 +	const int per_seg = pana8.stripe_count ? (int)pana8.stripe_count : total;
 +	if (total > PANA8_MAX_STRIPES) errs++;
 +	unsigned row_cursor = 0;
@@ -110,7 +105,7 @@ index 3343d74..f7aa204 100644
  	if (errs)
  		throw LIBRAW_EXCEPTION_IO_CORRUPT;
  
-@@ -129,34 +151,49 @@ void LibRaw::panasonicC8_load_raw()
+@@ -129,34 +147,49 @@ void LibRaw::panasonicC8_load_raw()
  
  void LibRaw::pana8_decode_loop(void *data)
  {
@@ -155,7 +150,7 @@ index 3343d74..f7aa204 100644
  	pana8_param_t *pana8_param = (pana8_param_t*)data;
 -	if (!data || stream < 0 || stream > 4 || stream > libraw_internal_data.unpacker_data.pana8.stripe_count) return 1; // error
 +	if (!data || stream < 0 || stream >= PANA8_MAX_STRIPES ||
-+		stream >= libraw_internal_data.unpacker_data.pana8.stripe_total) return 1; // error
++		stream >= libraw_internal_data.unpacker_data.pana8.stripe_total) return 1;
  
  	unsigned exactbytes = (libraw_internal_data.unpacker_data.pana8.stripe_compressed_size[stream] + 7u) / 8u;
      pana8_bufio_t bufio(libraw_internal_data.internal_data.input,
@@ -167,7 +162,7 @@ index 3343d74..f7aa204 100644
  }
  
  struct pana8_base_t
-@@ -174,7 +211,7 @@ struct pana8_base_t
+@@ -174,7 +207,7 @@ struct pana8_base_t
  };
  
  bool pana8_param_t::DecodeC8(pana8_bufio_t &bufio, unsigned int width, unsigned int height, LibRaw *libraw,
@@ -176,7 +171,7 @@ index 3343d74..f7aa204 100644
  {
    unsigned halfwidth = width >> 1;
    unsigned halfheight = height >> 1;
-@@ -311,7 +348,7 @@ bool pana8_param_t::DecodeC8(pana8_bufio_t &bufio, unsigned int width, unsigned
+@@ -311,7 +344,7 @@ bool pana8_param_t::DecodeC8(pana8_bufio_t &bufio, unsigned int width, unsigned
  				  line_base.clone((uint32_t *)(outrowp));
  		  }
  

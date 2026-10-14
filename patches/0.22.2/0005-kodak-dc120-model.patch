@@ -1,0 +1,14 @@
+diff --git a/src/metadata/identify.cpp b/src/metadata/identify.cpp
+index 7fd5b14..3570de8 100644
+--- a/src/metadata/identify.cpp
++++ b/src/metadata/identify.cpp
+@@ -3293,7 +3293,8 @@ void LibRaw::identify_finetune_dcr(char head[64], INT64 fsize, INT64 flen)
+ 				FORC4 cam_mul[c] = 1.0f;
+ 
+ 			}
+-			else if (!strcmp(model, "DC120")) {
++			else if (!strncmp(model, "DC120", 5)) {
++			  if (strlen(model) > 5) model[5] = 0;
+ 				raw_height = height = 976;
+ 				raw_width = width = 848;
+ 				iso_speed = 160;

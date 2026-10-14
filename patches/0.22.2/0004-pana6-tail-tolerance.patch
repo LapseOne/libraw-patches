@@ -1,0 +1,17 @@
+diff --git a/src/utils/open.cpp b/src/utils/open.cpp
+index ffd439e..068ba37 100644
+--- a/src/utils/open.cpp
++++ b/src/utils/open.cpp
+@@ -670,10 +670,10 @@ int LibRaw::open_datastream(LibRaw_abstract_datastream *stream)
+ 			  if (!ds)
+ 				  ds = libraw_internal_data.internal_data.input->size() - libraw_internal_data.unpacker_data.data_offset;
+ 			  if ((imgdata.sizes.raw_width % 11) == 0 &&
+-				  (INT64(imgdata.sizes.raw_height) * rowbytes11 == ds))
++				  (INT64(imgdata.sizes.raw_height) * rowbytes11 <= ds))
+ 				  load_raw = &LibRaw::panasonicC6_load_raw;
+ 			  else if ((imgdata.sizes.raw_width % 14) == 0 &&
+-				  (INT64(imgdata.sizes.raw_height) * rowbytes14 == ds))
++				  (INT64(imgdata.sizes.raw_height) * rowbytes14 <= ds))
+ 				  load_raw = &LibRaw::panasonicC6_load_raw;
+ 			  else
+ 				  imgdata.idata.raw_count = 0; // incorrect size
